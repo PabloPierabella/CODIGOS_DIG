@@ -1,0 +1,164 @@
+/*
+ * Copyright 2016-2024 NXP
+ * All rights reserved.
+ *
+ * Redistribution and use in source and binary forms, with or without modification,
+ * are permitted provided that the following conditions are met:
+ *
+ * o Redistributions of source code must retain the above copyright notice, this list
+ *   of conditions and the following disclaimer.
+ *
+ * o Redistributions in binary form must reproduce the above copyright notice, this
+ *   list of conditions and the following disclaimer in the documentation and/or
+ *   other materials provided with the distribution.
+ *
+ * o Neither the name of NXP Semiconductor, Inc. nor the names of its
+ *   contributors may be used to endorse or promote products derived from this
+ *   software without specific prior written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
+ * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+ * WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+ * DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR
+ * ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
+ * (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
+ * LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON
+ * ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+ * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
+ * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ */
+
+/**
+ * @file    TP1Y2Pierabella_Fernandez.c
+ * @brief   Application entry point.
+ */
+#include <stdio.h>
+#include "board.h"
+#include "peripherals.h"
+#include "pin_mux.h"
+#include "clock_config.h"
+#include "MKL46Z4.h"
+#include "fsl_debug_console.h"
+#include "Inic.h"
+
+#include <stdint.h>
+#include <time.h>
+
+// Remove the redefinition of CLOCKS_PER_SEC
+//#define CLOCKS_PER_SEC 10000  // This line is not needed
+
+// Definiciones de macros
+#define RETARDO_SEGUNDOS 5
+typedef signed char int8_t;
+
+#define LED_VERDE_OFF PTD->PSOR |= 1<<5;
+#define LED_VERDE_ON PTD->PCOR |= 1<<5;
+#define LED_VERDE_T PTD->PTOR |= 1<<5;
+
+#define SW1 !(PTC->PDIR & (1<<3))
+#define SW3 !(PTC->PDIR & (1<<12))
+
+// Function prototypes
+void Control();
+void led_verde(int x);
+void inicio_timer();
+
+
+int main(void) {
+    /* Init board hardware. */
+    BOARD_InitBootPins();
+    BOARD_InitBootClocks();
+    BOARD_InitBootPeripherals();
+#ifndef BOARD_INIT_DEBUG_CONSOLE_PERIPHERAL
+    /* Init FSL debug console. */
+    BOARD_InitDebugConsole();
+#endif
+    inicializa();
+
+    while (1) {
+        Control();
+    }
+
+    return 0;
+}
+
+void Control() {
+    // Definiciones + Seteo inicial
+    static int8_t L1 = 1, L2 = 0, L3 = 0, L4 = 0, L5 = 0, L6 = 0, L7 = 0, L8 = 0, L9 = 0, L10 = 0;
+    int8_t T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14, T15, T16, T17, T18;
+    int8_t Ct = 0, ft = 0;
+    clock_t tiempo_inicial=0;
+
+    // Adquisición de entradas
+    int8_t Entrada1 = SW1;
+    int8_t Entrada2 = SW3;
+
+    // Definición de transiciones
+    T1 = L1 && Entrada1;
+    T2 = L1 && (!Entrada1) && (Entrada2);
+    T3 = L2 && (!Entrada1) && (!ft);
+    T4 = L5 && (!Entrada2) && (!ft);
+    T5 = L3 && Entrada2 && (!ft);
+    T6 = L6 && Entrada1 && (!ft);
+    T7 = L4 && (!Entrada2) && (!ft);
+    T8 = L7 && (!Entrada1) && (!ft);
+    T9 = L8 && Entrada1;
+    T10 = L8 && Entrada2 && (!Entrada1);
+    T11 = L9 && (!Entrada1);
+    T12 = L10 && (!Entrada2);
+    T13 = L2 && ft;
+    T14 = L3 && ft;
+    T15 = L5 && ft;
+    T16 = L6 && ft;
+    T17 = L7 && ft;
+    T18 = L4 && ft;
+
+    // Evolución del marcado
+    if (T1) { L1 = 0; L2 = 1; Ct = 1; inicio_timer(); timer(&Ct, inicio_timer, &ft); }
+    if (T2) { L1 = 0; L5 = 1; Ct = 1; inicio_timer(); timer(&Ct, inicio_timer, &ft); }
+    if (T3) { L2 = 0; L3 = 1; Ct = 1; timer(&Ct, inicio_timer, &ft); }
+    if (T4) { L5 = 0; L6 = 1; Ct = 1; timer(&Ct, inicio_timer, &ft); }
+    if (T5) { L3 = 0; L4 = 1; Ct = 1; timer(&Ct, inicio_timer, &ft); }
+    if (T6) { L6 = 0; L7 = 1; Ct = 1; timer(&Ct, inicio_timer, &ft); }
+    if (T7) { L4 = 0; L8 = 1; Ct = 0; timer(&Ct, inicio_timer, &ft); }
+    if (T8) { L7 = 0; L8 = 1; Ct = 0; }
+    if (T9) { L8 = 0; L9 = 1; }
+    if (T10) { L8 = 0; L10 = 1; }
+    if (T11) { L9 = 0; L1 = 1; }
+    if (T12) { L10 = 0; L1 = 1; }
+    if (T13) { L2 = 0; L8 = 1; Ct = 0; }
+    if (T14) { L3 = 0; L8 = 1; Ct = 0; }
+    if (T15) { L5 = 0; L8 = 1; Ct = 0; }
+    if (T16) { L6 = 0; L8 = 1; Ct = 0; }
+    if (T17) { L7 = 0; L8 = 1; Ct = 0; }
+    if (T18) { L4 = 0; L1 = 1; Ct = 0; }
+
+    // Producir Salidas
+    led_verde((L8 || L9 || L10));
+    Ct = L2 || L3 || L4 || L5 || L6 || L7;
+}
+
+void led_verde(int x) {
+    if (x) {
+        LED_VERDE_ON;
+    } else {
+        LED_VERDE_OFF;
+    }
+}
+
+void inicio_timer(clock_t tiempo_inicial) {
+
+	tiempo_inicial= clock();
+}
+
+void timer(int8_t *Ct, clock_t tiempo_inicial, int8_t *ft) {
+    double tiempo_transcurrido = 0;
+	while (*Ct == 1) {
+        tiempo_transcurrido = (double)(clock() - tiempo_inicial) / CLOCKS_PER_SEC;
+        if (tiempo_transcurrido >= RETARDO_SEGUNDOS) {
+            *ft = 1; // Levantamos ft
+        } else {
+            *ft = 0;
+        }
+    }
+}
